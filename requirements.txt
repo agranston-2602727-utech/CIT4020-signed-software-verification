@@ -1,0 +1,4 @@
+# Pinned to the version the tool was developed and tested with.
+# If your golden VM installs a different version, re-run the tests and
+# update this pin to the version you actually tested (pip show cryptography).
+cryptography==50.0.2

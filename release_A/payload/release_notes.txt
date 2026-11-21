@@ -1,0 +1,5 @@
+HarbourView lab release 1.0 - Release notes (FABRICATED SAMPLE, CIT4020 lab data)
+
+- First lab release used to test signed release verification.
+- Contains app.py, config/settings.ini and this file.
+- Clients must run release_guard.py verify and see ACCEPTED before using it.

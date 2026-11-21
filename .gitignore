@@ -1,0 +1,24 @@
+# SECRET: the publisher's encrypted private key. Never commit, never ZIP.
+publisher_keys/*
+!publisher_keys/.gitkeep
+
+# Python / environment
+.venv/
+__pycache__/
+*.pyc
+
+# Scratch test copies (release_T3/, release_T4a/, ...) and generated logs
+scratch/*
+!scratch/README.md
+release_T*/
+release_log.jsonl
+
+# The AI-produced plan/guide PDF is reference material, not part of the source ZIP
+CIT4020_Assignment2_Project_Plan_and_Guide.pdf
+
+# Editor / OS clutter
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

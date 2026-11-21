@@ -1,0 +1,7 @@
+# Signed release files are hashed BYTE FOR BYTE. If Git converted line endings
+# (CRLF on Windows, LF on Linux), a checkout on another OS would no longer match
+# the signed manifest and release_A would fail with HASH_MISMATCH / BAD_SIGNATURE.
+# "-text" tells Git to store and check out these files exactly as they are.
+release_A/** -text
+*.sig binary
+*.pem -text
