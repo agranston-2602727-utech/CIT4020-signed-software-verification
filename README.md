@@ -1,6 +1,6 @@
 # release_guard: Signed Software Release Verification
 
-CIT4020 Computer Security · Group Lab Project (Assignment 2) · Group **XX** *(fill in)*
+CIT4020 Computer Security · Group Lab Project (Assignment 2) · Group **6** *(Anthony x Quan) +3*
 
 `release_guard.py` is a Python 3 command-line tool for the fictional client
 **HarbourView Business Systems Ltd.** It replaces the old update check ("the folder
