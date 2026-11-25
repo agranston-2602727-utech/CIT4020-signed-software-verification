@@ -1,3 +1,7 @@
+# Never convert line endings for any file in this repo: store and check out
+# every file exactly as it is on disk.
+* -text
+
 # Signed release files are hashed BYTE FOR BYTE. If Git converted line endings
 # (CRLF on Windows, LF on Linux), a checkout on another OS would no longer match
 # the signed manifest and release_A would fail with HASH_MISMATCH / BAD_SIGNATURE.
