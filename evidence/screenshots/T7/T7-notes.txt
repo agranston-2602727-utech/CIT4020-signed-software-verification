@@ -1,0 +1,8 @@
+Test Done by Ryeem Fletcher
+
+These screenshots show a test (T7) for an untrusted/unknown publisher in a signed software verification workflow:
+Baseline Registry Check (sha256sum): Computes and records the SHA-256 hash (ca0e6aed1fc224486ca20b23d93e9ad616622c3dc9cdd324bd56fe51d8064f05) of verifier/trusted_publishers.json to ensure the main verifier registry stays unchanged.
+Separate Publisher Setup (release_guard.py setup): Generates a new keypair and registry entry for publisher otherpub in isolated directories (scratch/other_keys and scratch/other_verifier), with enabled: true inside scratch/other_verifier/trusted_publishers.json.
+Copy & Sign Release (cp & release_guard.py sign): Copies release_A to scratch/release_T7 and signs it as otherpub (3 files hashed), generating manifest.json and a 64-byte signature.sig.
+Registry Comparison (cat): Shows that the main verifier/trusted_publishers.json only trusts harbourview, while otherpub only exists in scratch/other_verifier/trusted_publishers.json.
+Verification Result (release_guard.py verify): Passes Check 1 (files and manifest structure valid), then rejects scratch/release_T7 at Check 2 with UNKNOWN_PUBLISHER because otherpub is not in the trusted verifier registry.

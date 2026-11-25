@@ -1,0 +1,14 @@
+Test Done by Ryeem Fletcher
+
+These screenshots show a re-signing / idempotency & audit-logging test (T9) on a copied release (scratch/release_T9) using publisher:
+Copy Release (cp -a): Copies release_A into scratch/release_T9 while preserving attributes.
+Initial File Metadata & Hashes (ls -l & sha256sum): Shows manifest.json (486 bytes) and signature.sig (64 bytes), along with their starting SHA-256 hashes (bd74237... and 6983c44...).
+First Signing (release_guard.py sign): Signs scratch/release_T9 as harbourview (3 files hashed), generating manifest.json and a 64-byte signature.sig.
+Second Signing (release_guard.py sign): Runs the sign command a second time on scratch/release_T9 as harbourview (also hashing 3 files and producing a 64-byte signature.sig).
+Updated Metadata & Hashes (ls -l & sha256sum): Shows updated timestamps (14:50:29... -0500), a slightly changed manifest.json size (469 bytes), and new SHA-256 hashes for both manifest.json (a2747c7...) and signature.sig (e8d24c9...).
+Audit Log Check (tail -n 2 release_log.jsonl): Confirms two "SIGNED" log entries with "reason": "OK" for scratch/release_T9 under harbourview at 2026-11-23T19:49:55+00:00 and 2026-11-23T19:50:29+00:00.
+
+Testing - Custom security test (write the prediction FIRST)
+Prediction: I predict that the verification tool will reject the release with BAD_SIGNATURE.
+
+Explanation: The attacker may create a release using their own private key while claiming the approved publisher ID harbourview. However, the verification tool uses the legitimate public key stored in the trusted publisher registry to validate the signature. Since the attacker's private key does not correspond to the legitimate public key, the signature verification will fail. This demonstrates that simply claiming an approved publisher ID is insufficient to impersonate a trusted publisher.

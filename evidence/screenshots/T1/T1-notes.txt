@@ -1,0 +1,4 @@
+Test Done By Nicolai Brooks 
+Action: Ran setup for harbourview, checked private key header and sha256sum, then ran setup a second time and re-checked sha256sum. Expected Result: First run creates encrypted private key (ENCRYPTED header), public key, and registry entry; second run refuses overwrite and leaves key hash unchanged. Actual Result: ———BEGIN ENCRYPTED PRIVATE KEY——— SETUP REFUSED: ‘publisher_keys/harbourview_private.pem’ already exists. Existing keys are never overwritten. Pass/Fail: PASS 
+
+Action: Signed release_A with --release, checked manifest.json and signature.sig byte size, verified release_A, and inspected release_log.jsonl. Expected Result: manifest.json and 64-byte signature.sig created; verify outputs ACCEPTED; log entries written with no secrets. 

@@ -1,0 +1,8 @@
+Test done by Ryeem Fletcher
+These terminal screenshots show a tamper-testing exercise for signed software verification (test case T6). Copy a release directory (release_A), corrupt a single byte inside its digital signature (signature.sig), verify the difference, and run release_guard.py to confirm that the verification tool catches the tampering and rejects the release.
+
+Setup & Backup: release_A is copied to scratch/release_T6, and signature.sig is backed up to scratch/T6_signature.orig.
+Install & Inspect (xxd): After installing xxd, inspecting byte offset 10 of signature.sig shows hex value e2
+Tamper (dd): Byte 10 (the 11th byte) is overwritten with 0x00 (\x00) without truncating the rest of the 64-byte signature file.
+Diff Check (cmp): Confirms the single-byte change from octal 342 (0xe2) to 0 (0x00) at byte position 11.
+Verification Result (release_guard.py): Passes file/JSON and trusted-publisher (harbourview) checks, then rejects the release with BAD_SIGNATURE because the modified signature no longer matches manifest.json.

@@ -1,0 +1,3 @@
+Test Done By Nicolai Brooks
+
+Action: Tested missing payload/config/settings.ini in release_T4_missing and added unlisted payload/ config/extra_test.txt in release_T4_extra, running verify --release on each. Expected Result: release_T4_missing prints REJECTED (MISSING_FILE); release_T4_extra prints REJECTED (EXTRA_FILE). Actual Result: REJECTED - MISSING_FILE (check 5): listed in manifest but not in payload/: config/settings REJECTED - EXTRA_FILE (check 5): in payload/ but not listed in manifest: config/extra_test.txt Pass/Fail: PASS 

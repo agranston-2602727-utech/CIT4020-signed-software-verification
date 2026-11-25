@@ -1,0 +1,3 @@
+Test done by Nicolai Brooks
+
+Action: Copied release_A to release_T3, recorded before/after content and sha256sum of payload/app.py after appending #, and ran verify --release release_T3 Expected Result: REJECTED with HASH_MISMATCH naming app.py. Actual Result: REJECTED - HASH_MISMATCH (check 5): contents differ from the signed manifest: app.py Pass/Fail:  PASS Figure: 

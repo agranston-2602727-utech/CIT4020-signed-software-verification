@@ -1,0 +1,8 @@
+Test Done by Ryeem Fletcher
+
+These screenshots show a disabled-publisher test followed by re-enabling and restoring the registry for a valid release (release_A):
+Backup & Disable Publisher (cp & sed): Backs up verifier/trusted_publishers.json to scratch/registry_backup.json and edits verifier/trusted_publishers.json in-place to change "enabled": true to "enabled": false for publisher harbourview.
+Verification While Disabled (release_guard.py verify): Runs verification on release_A, which passes Check 1 (files and manifest valid) and rejects the release at Check 2 with PUBLISHER_DISABLED because harbourview is listed in the registry with enabled = false.
+Re-enable Publisher (sed & cat): Updates "enabled": false back to "enabled": true in verifier/trusted_publishers.json and confirms the change via cat.
+Full Verification Pass (release_guard.py verify): Re-runs verification on release_A and confirms it is ACCEPTED, passing all five checks (file/manifest validity, enabled publisher in registry, valid signature under the registry's public key, safe paths/no symlinks or special files in payload/, and exact file/hash match with no extra files).
+Restore Check (cmp): Compares verifier/trusted_publishers.json against scratch/registry_backup.json and outputs "registry restored", confirming the registry matches the original backup.

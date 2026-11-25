@@ -1,0 +1,17 @@
+Test Done by Ryeem Fletcher
+
+T10b: Validly signed path traversal ../outside.txt
+
+These screenshots show a spoofed-publisher / rogue-key attack test (T10a) in a signed software verification workflow:
+Rogue Keypair Setup (release_guard.py setup): Generates a separate keypair and registry entry impersonating publisher harbourview inside scratch/attacker_keys and scratch/attacker_verifier.
+Copy & Modify Payload (cp -a & echo): Copies release_A to scratch/release_T10a and appends # attacker change to scratch/release_T10a/payload/app.py.
+Sign with Attacker Key (release_guard.py sign): Signs scratch/release_T10a as harbourview using the private key from scratch/attacker_keys (3 files hashed), generating a 64-byte signature.sig.
+Manifest Check (grep): Confirms manifest.json lists "publisher_id": "harbourview".
+Verification Result (release_guard.py verify): Checks scratch/release_T10a against the trusted verifier/trusted_publishers.json registry—passing Check 1 (files/manifest valid) and Check 2 (harbourview is in the registry and enabled), but rejecting at Check 3 with BAD_SIGNATURE because the signature was created with the attacker's key rather than the legitimate key registered for harbourview.
+
+
+This screenshot shows an unsafe-path / path-traversal test (T10b) in a signed software verification workflow:
+Copy Release (cp -a): Copies release_A into scratch/release_T10b while preserving attributes.
+Craft Malicious Manifest (python3 -c & grep): Loads release_A/manifest.json, appends an entry for '../outside.txt' (with a 64-character '0' string as sha256) into files, writes the result to scratch/T10b_manifest.json, and confirms line 16 contains "path": "../outside.txt".
+Sign Custom Manifest (t10_sign_custom_manifest.py): Uses a test-only script to sign the custom manifest as harbourview into scratch/release_T10b.
+Verification Result (release_guard.py verify): Passes Check 1 (files and manifest valid), Check 2 (harbourview in trusted registry and enabled), and Check 3 (signature valid under the registry's public key), then rejects at Check 4 with UNSAFE_PATH because '../outside.txt' contains '..'.

@@ -1,0 +1,3 @@
+Test done by Nicolai Brooks
+
+Action: Copied release_A to release_T5, edited "release_name" in manifest.json to "release_A-modified" without re-signing, and ran verify --release release_T5 Expected Result: REJECTED with BAD_SIGNATURE. Actual Result: REJECTED - BAD_SIGNATURE (check 3): signature.sig does not match the bytes of manifest.json under the registered key of 'harbourview'  Pass/Fail: PASS Figure:
