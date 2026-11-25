@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 """
 release_guard.py - Signed Software Release Verification
 CIT4020 Computer Security, Group Lab Project (Assignment 2)
