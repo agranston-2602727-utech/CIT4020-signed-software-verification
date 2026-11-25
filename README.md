@@ -2,9 +2,7 @@
 
 CIT4020 Computer Security · Group Lab Project (Assignment 2) · Group **6** *(Anthony x Quan) +3*
 
-`release_guard.py` is a Python 3 command-line tool for the fictional client
-**HarbourView Business Systems Ltd.** It replaces the old update check ("the folder
-name looks right") with a real one:
+The `release_guard.py` is a command-line tool project for a fictional client named HarbourView Business Systems Ltd. The tool lets a software publisher sign a release, and lets a client check that the release really came from a trusted publisher and hasn't been changed since it was signed
 
 | Command  | Who runs it | What it does |
 |----------|-------------|--------------|
