@@ -1,7 +1,15 @@
 ## Cover Page
 --- 
 # Project Overview
-HarbourView Business Systems Ltd project is a command-line tool, `release_guard.py`. The tool lets a software publisher sign a release, and lets a client check that the release really came from a trusted publisher and hasn't been changed since it was signed
+
+The `release_guard.py` is a command-line tool project for a fictional client named HarbourView Business Systems Ltd. The tool lets a software publisher sign a release, and lets a client check that the release really came from a trusted publisher and hasn't been changed since it was signed
+
+## Project Workflow
+ 
+```text
+Publisher: setup (once) => sign release_A/ (payload + manifest + signature)
+Client: (receives public key + registry entry out of band) => verify release_A
+```
 
 ### The Workflow has three steps:
 1. `setup` creates an Ed25519 key pair for a publisher. The private keys is encrypted with a passphrase and stays on the publisher's side. The public key and a registry entry go into the client's trust store. 
@@ -236,6 +244,35 @@ flowchart TD
 
 --- 
 # Test Results 
+
+---
+
+### Formal test results (T1–T10)
+
+All ten brief tests were run against `release_guard.py` and recorded with terminal screenshots in `evidence/screenshots/T1` … `T10`. The full record, with the actual output, the T10 prediction record and the assessment of each tester's notes, is in [`evidence/test_results.md`](../evidence/test_results.md). Testers: NB (Nicolai Brooks, T1–T5, Kali VM, 22 Nov 2026), TC (re-run of T1–T5, Kali VM, 23 Nov 2026) and RF (Ryeem Fletcher, T6–T10, Kali on WSL, 23 Nov 2026), using Python 3 with `cryptography 50.0.2`.
+
+| T              | Action                                                                                                  | Expected result                                                   | Actual result                                                                                                                                             | Pass/Fail                                               | Figure                       |
+| -------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------------- |
+| T1             | Ran `setup` from a clean state, showed the key header, ran `setup` again                                | Header says ENCRYPTED; second `setup` refuses; hashes unchanged   | Hidden prompt with no echo; `BEGIN ENCRYPTED PRIVATE KEY`; `SETUP REFUSED … Existing keys are never overwritten.`; identical `sha256sum` before and after | Pass                                                    | T1.1-v2-TC, T1.2-v2-TC       |
+| T2 (attempt 1) | Ran `sign` without the `--release` flag; typed `w -c` instead of `wc -c`                                | ACCEPTED; log written                                             | argparse error `--release is required`; `manifest.json` not found (operator error)                                                                        | Fail (operator error)                                   | T1.3-NB                      |
+| T2 (re-run)    | Signed `release_A`, showed the manifest and signature size, verified, showed the log                    | ACCEPTED; 64-byte signature; log written                          | 3 files hashed; `64 release_A/signature.sig`; checks 1–5 passed, `ACCEPTED`; log has `SIGNED/OK` and `ACCEPTED/OK` with no secrets                        | Pass                                                    | T2.1-NB, T2.2-NB, T2.2-v2-TC |
+| T3             | Copied the release, appended one character to `app.py`, verified                                        | REJECTED, HASH_MISMATCH                                           | `REJECTED - HASH_MISMATCH (check 5): … app.py` (hash `06dd72f4…` → `18b965ae…`)                                                                           | Pass                                                    | T3.1-NB, T3.2-NB             |
+| T4a            | Deleted `config/settings.ini` in a copy, verified                                                       | REJECTED, MISSING_FILE                                            | `REJECTED - MISSING_FILE (check 5): … config/settings.ini`                                                                                                | Pass                                                    | T4.1-NB, T4.1-v2-TC          |
+| T4b            | Added an unlisted `config/extra_test.txt` in a copy, verified                                           | REJECTED, EXTRA_FILE                                              | `REJECTED - EXTRA_FILE (check 5): … config/extra_test.txt`                                                                                                | Pass                                                    | T4.2-NB, T4.2-v2-TC          |
+| T5             | Edited `release_name` without re-signing, verified                                                      | REJECTED, BAD_SIGNATURE                                           | `REJECTED - BAD_SIGNATURE (check 3)`                                                                                                                      | Pass                                                    | T5.1-NB, T5.1-v2-TC          |
+| T6             | Changed byte 10 of `signature.sig` (`0xe2` → `0x00`), verified                                          | REJECTED, BAD_SIGNATURE                                           | `cmp -l` shows `11 342 0` (one byte differs); `REJECTED - BAD_SIGNATURE (check 3)`                                                                        | Pass                                                    | T6.1-RF, T6.2-RF, T6.3-RF    |
+| T7             | Signed a copy as `otherpub`, whose keys are only in scratch folders; verified against the real registry | REJECTED, UNKNOWN_PUBLISHER                                       | Real registry lists only `harbourview`; `REJECTED - UNKNOWN_PUBLISHER (check 2)`                                                                          | Pass                                                    | T7.1-RF, T7.2-RF             |
+| T8             | Set `enabled` to false and verified; set it to true and verified again                                  | PUBLISHER_DISABLED, then ACCEPTED                                 | `REJECTED - PUBLISHER_DISABLED (check 2)`, then `ACCEPTED`; `cmp` confirms `registry restored`                                                            | Pass                                                    | T8.1-RF, T8.2-RF             |
+| T9             | Ran `sign` on a copy twice, with `ls -l` and `sha256sum` before and after                               | Wrong or empty passphrase: clear error, no crash, files unchanged | Both runs gave `SIGNED` (correct passphrase used); files and hashes changed; wrong and empty passphrases never tried                                      | **Fail** (not carried out as specified; re-run pending) | T9.1-RF, T9.2-RF             |
+| T10a           | Scenario (a): signed with the attacker's own key, claiming `publisher_id` `harbourview`                 | Prediction: BAD_SIGNATURE at check 3                              | Checks 1–2 passed; `REJECTED - BAD_SIGNATURE (check 3)`                                                                                                   | Pass (prediction correct)                               | T10.1-RF, T10.2-RF           |
+
+**Summary.** 11 of the 12 brief test cases (T1–T8, T10a, T10b) produced exactly the expected result, and every rejection named the right reason and check number. Two runs are recorded as Fail, and both are procedure problems, not tool defects:
+
+- **T2, first attempt:** the command was mistyped. The tool rejected the malformed arguments cleanly, and the corrected re-run passed.
+- **T9:** the screenshots show two *successful* signs with the correct passphrase, so the wrong- and empty-passphrase paths were never tried. The code path exists: `load_private_key` returns `None`, and `sign` prints `SIGN FAILED - BAD_PASSPHRASE … Nothing was written.` before writing anything. It still has to be shown in a re-run, with `ls -l --time-style=full-iso` and `sha256sum` before and after.
+
+**What T10 shows.**
+- **T10a:** claiming a trusted `publisher_id` gains an attacker nothing. Check 3 always uses the public key from the *client's* registry, never a key supplied with the release. Because the attacker re-signed, the hashes matched the tampered `app.py`, so check 3 was the only defence.
 
 ---
 
