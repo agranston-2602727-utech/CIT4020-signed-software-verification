@@ -1,37 +1,72 @@
 # Formal Test Results (T1–T10)
 
-> **Fill in ONLY from the formal run on the frozen code.** Never write "Actual" before running,
-> never change "Expected" afterwards, never copy results from the automated tests or from AI output.
-> A failed test is recorded as **Fail**, then re-tested in a separate row with the new commit hash.
+> Results are taken from the screenshots in `evidence/screenshots/T1` … `T10` and the testers' notes
+> (`T<n>-notes.txt`). Each note was checked against its screenshots and against what the brief asks
+> each test to show. Where a note disagreed with the screenshots or the brief, this table follows
+> the screenshots and the brief. The section "Assessment of tester notes" below lists every correction.
 
-- **Frozen code commit:** `‹git rev-parse --short HEAD›`
-- **Run by:** ‹M3 name› · **Date/time (UTC):** ‹…› · **Machine:** ‹golden VM, OS, Python version, cryptography version›
+- **Code under test:** `release_guard.py` (the five-check verifier). The testers did not record the commit hash. The evidence was committed in `bda72ef` (2026-11-25).
+- **Testers / runs:**
+  - **NB** (Nicolai Brooks, M3): Kali VM, `~/projects/CIT4020-signed-software-verification-master`, 2026-11-22. Covers T1–T5.
+  - **TC** (v2 re-run): Kali VM, `~/CIT4020-signed-software-verification`, 2026-11-23. Covers T1–T5.
+  - **RF** (Ryeem Fletcher): Kali on WSL, `/mnt/c/CIT4020-signed-software-verification`, 2026-11-23. Covers T6–T10.
+- **Environment:** Python 3 virtual environment (`.venv`) with `cryptography==50.0.2` from `requirements.txt` (see `Environment_Setup/Evironment_setup.png`).
+- **Figure naming:** figures use the screenshot file names, e.g. `T3.1-NB` = `evidence/screenshots/T3/T3.1-NB.png`.
 
-| Test | Action (one line) | Expected result | Actual result | Pass/Fail | Figures |
-|------|-------------------|-----------------|---------------|-----------|---------|
-| T1 | setup from clean state; show key header; setup again | Header ENCRYPTED; second setup refused; sha256 identical | | | T1-1..3 |
-| T2 | sign release_A; show manifest, sig size; verify; show log | ACCEPTED; sig 64 bytes; log lines written | | | T2-1..4 |
-| T3 | copy; append 1 char to app.py; verify | REJECTED HASH_MISMATCH | | | T3-1..2 |
-| T4a | copy; delete config/settings.ini; verify | REJECTED MISSING_FILE | | | T4-1 |
-| T4b | copy; add config/extra.ini; verify | REJECTED EXTRA_FILE | | | T4-2 |
-| T5 | copy; edit release_name, no re-sign; verify | REJECTED BAD_SIGNATURE | | | T5-1..2 |
-| T6 | copy; change 1 byte of signature.sig; verify | REJECTED BAD_SIGNATURE | | | T6-1..2 |
-| T7 | second publisher in scratch folders; sign copy; verify vs real registry | REJECTED UNKNOWN_PUBLISHER | | | T7-1..3 |
-| T8 | enabled=false, verify; enabled=true, verify | PUBLISHER_DISABLED, then ACCEPTED | | | T8-1..2 |
-| T9 | sign copy with wrong, then empty passphrase | Clear error, no crash, files unchanged | | | T9-1..3 |
-| T10a | ‹your scenario› | ‹prediction, committed at ‹time/hash› before running› | | | T10-… |
-| T10b | ‹your scenario› | ‹prediction› | | | T10-… |
+## Results table
 
-## T10 prediction record (write and commit BEFORE running)
+| T | Action | Expected result | Actual result | Pass/Fail | Figure |
+|---|--------|-----------------|---------------|-----------|--------|
+| T1 | From a clean state, ran `setup --publisher-id harbourview`, showed `head -1` of the private key, ran `setup` again, and took `sha256sum` before and after. | Hidden passphrase prompt; key header says ENCRYPTED; second `setup` refuses to overwrite; key hash identical before and after. | Passphrase prompted twice with no echo. Header: `-----BEGIN ENCRYPTED PRIVATE KEY-----`. Second run: `SETUP REFUSED: 'publisher_keys/harbourview_private.pem' already exists. Existing keys are never overwritten.` `sha256sum` of the private key, public key and `trusted_publishers.json` was identical before and after (`ef3d0cea…`, `0ebeec38…`, `ca0e6aed…`). Private key permissions are `-rw-------` (T1.1-NB). | **Pass** | T1.1-v2-TC, T1.2-v2-TC, T1.1-NB, T1.2-NB |
+| T2 (attempt 1) | Ran `sign --publisher-id harbourview release_A` without the `--release` flag, then `cat manifest.json` and `w -c signature.sig` (typo). | ACCEPTED; log entry written. | argparse error: `the following arguments are required: --release`. `cat`: `No such file or directory`. `w -c` ran the Unix `w` command instead of `wc`. Nothing was signed or verified. | **Fail** (operator error, not a tool defect; re-run below) | T1.3-NB |
+| T2 (re-run) | Signed `release_A`, showed `manifest.json`, ran `wc -c signature.sig`, verified, and showed the log. | ACCEPTED; 64-byte signature; SIGNED and ACCEPTED log lines with no secrets. | `SIGNED 'release_A' as publisher 'harbourview'` (files hashed: 3). The manifest lists `app.py`, `config/settings.ini` and `release_notes.txt` with SHA-256 hashes, plus `publisher_id` and `release_name`. `64 release_A/signature.sig`. Checks 1–5 passed: `ACCEPTED: 'release_A' from publisher 'harbourview' passed all five checks.` `release_log.jsonl` has `"result": "SIGNED", "reason": "OK"` and `"result": "ACCEPTED", "reason": "OK"`, with no key or passphrase. | **Pass** | T2.1-NB, T2.2-NB, T2.3-NB, T2.1-v2-TC, T2.2-v2-TC |
+| T3 | Copied the release, appended one character (`printf '#' >> payload/app.py`), and verified. | REJECTED, HASH_MISMATCH, naming `app.py`. | `cat` before and after shows the trailing `#`. The `app.py` hash changed from `06dd72f4…` to `18b965ae…`. Checks 1–4 passed, then `REJECTED - HASH_MISMATCH (check 5): contents differ from the signed manifest: app.py`. | **Pass** | T3.1-NB, T3.2-NB, T3.1-v2-TC |
+| T4a | Copied the release, deleted `payload/config/settings.ini`, and verified. | REJECTED, MISSING_FILE. | `ls -R` before shows `config/settings.ini`; after, `config/` is empty. Checks 1–4 passed, then `REJECTED - MISSING_FILE (check 5): listed in manifest but not in payload/: config/settings.ini`. | **Pass** | T4.1-NB, T4.1-v2-TC |
+| T4b | Copied the release, added an unlisted file in a subfolder (`payload/config/extra_test.txt`), and verified. | REJECTED, EXTRA_FILE. | `ls -R` before shows only `settings.ini` in `config/`; after, it shows `extra_test.txt settings.ini`. Checks 1–4 passed, then `REJECTED - EXTRA_FILE (check 5): in payload/ but not listed in manifest: config/extra_test.txt`. | **Pass** | T4.2-NB, T4.2-v2-TC |
+| T5 | Copied the release, changed `release_name` in `manifest.json` by hand without re-signing, and verified. | REJECTED, BAD_SIGNATURE. | `grep` shows the edited line: `"release_name": "release_A"` became `"tampered"` (TC) / `"release_A-modified"` (NB). Checks 1–2 passed, then `REJECTED - BAD_SIGNATURE (check 3): signature.sig does not match the bytes of manifest.json under the registered key of 'harbourview'`. | **Pass** | T5.1-NB, T5.1-v2-TC |
+| T6 | Copied the release, backed up `signature.sig`, and overwrote byte offset 10 with `0x00` using `dd … conv=notrunc`. Verified. | REJECTED, BAD_SIGNATURE. | `xxd -s 10 -l 1` shows the original byte is `e2` (not `00`, so the change is real). `cmp -l` output `11 342 0` proves exactly one byte differs (octal 342 = `0xe2` → `0x00`). The file is still 64 bytes. Checks 1–2 passed, then `REJECTED - BAD_SIGNATURE (check 3)`. | **Pass** | T6.1-RF, T6.2-RF, T6.3-RF |
+| T7 | Ran `setup` for `otherpub` in scratch folders (`scratch/other_keys`, `scratch/other_verifier`), signed a copy as `otherpub`, and verified it against the real registry. | REJECTED, UNKNOWN_PUBLISHER. | Real registry `sha256sum` `ca0e6aed…` was recorded first. `cat` of both registries: the real one lists only `harbourview`; the scratch one lists only `otherpub`. Check 1 passed, then `REJECTED - UNKNOWN_PUBLISHER (check 2): publisher 'otherpub' is not in the trusted registry`. | **Pass** | T7.1-RF, T7.2-RF |
+| T8 | Backed up the registry, set `enabled` to `false` and verified `release_A`, set it back to `true` and verified again, then compared with the backup. | PUBLISHER_DISABLED, then ACCEPTED; registry restored. | `cat` shows `"enabled": false`. Check 1 passed, then `REJECTED - PUBLISHER_DISABLED (check 2): publisher 'harbourview' is in the registry but enabled = false`. `cat` shows `"enabled": true`, and the next run gives `ACCEPTED … passed all five checks` (the registry is re-read on each run, with no caching). `cmp` against the backup printed `registry restored`. | **Pass** | T8.1-RF, T8.2-RF |
+| T9 | Recorded `ls -l --time-style=full-iso` and `sha256sum` of a copy, ran `sign` twice, then re-recorded them. | Wrong passphrase (and, as a bonus, empty passphrase): clear `SIGN FAILED - BAD_PASSPHRASE` message, no traceback, files unchanged. | Both runs printed `SIGNED 'scratch/release_T9' as publisher 'harbourview'`, so the correct passphrase was entered both times. The files changed: `manifest.json` went from 486 to 469 bytes, both hashes changed (`bd742371…` → `a2747c7e…`, `6983c447…` → `e8d24c9b…`), and the timestamps changed. The log shows two `SIGNED / OK` entries. No wrong or empty passphrase was ever tried. | **Fail** (test not carried out as specified; needs re-run) | T9.1-RF, T9.2-RF |
+| T10a | Scenario (a): created an attacker key pair in scratch folders under the id `harbourview`, tampered with `app.py`, signed with the attacker key, and verified against the real registry. | Prediction, written before running (in `T9-notes.txt`): REJECTED, BAD_SIGNATURE at check 3, because the verifier uses the registry's public key, not the attacker's. | `grep` shows `"publisher_id": "harbourview"`. Checks 1–2 passed (the claimed id is trusted and enabled), then `REJECTED - BAD_SIGNATURE (check 3): signature.sig does not match the bytes of manifest.json under the registered key of 'harbourview'`. | **Pass** (prediction correct) | T10.1-RF, T10.2-RF |
+| T10b | Scenario (b): built a manifest containing `../outside.txt`, signed it validly with the real `harbourview` key using the test-only helper `tests/t10_sign_custom_manifest.py`, and verified. | REJECTED, UNSAFE_PATH at check 4, after checks 1–3 pass. No written prediction was found in the evidence (see T10 record). | `grep -n` shows line 16 is `"path": "../outside.txt"`. Helper output: `TEST-ONLY: signed hand-written manifest into 'scratch/release_T10b'`. Checks 1–3 passed (the signature is valid), then `REJECTED - UNSAFE_PATH (check 4): manifest path '../outside.txt' contains '..'`. | **Pass** | T10.3-RF |
 
-- **Scenario:**
-- **Prediction (which check, which code, why):**
-- **Prediction committed at:** ‹commit hash / time›
-- **Actual output:**
-- **Explanation / was the prediction right?:**
+## T10 prediction record
+
+### T10a: attacker's own key claims the approved `publisher_id` (scenario a)
+
+- **Scenario:** An attacker runs `setup --publisher-id harbourview` into `scratch/attacker_keys` and `scratch/attacker_verifier`. They append `# attacker change` to `app.py` in a copy of the release and sign it with their own key, claiming to be `harbourview`. The release is then verified against the real `verifier/trusted_publishers.json`.
+- **Prediction (which check, which code, why):** REJECTED, **BAD_SIGNATURE at check 3**. The verifier looks up `harbourview` in the client's registry and uses the public key stored there. The attacker's private key does not match that key, so the signature fails. Claiming an approved `publisher_id` only decides which trusted key is used. It does not supply the attacker's key. (Recorded in `T9/T9-notes.txt` under "Custom security test (write the prediction FIRST)".)
+- **Prediction committed at:** not recorded. It was written in the notes file before the run, per the tester, and only committed with the evidence in `bda72ef`.
+- **Actual output:** `check 1 passed`, `check 2 passed: publisher is in the trusted registry and enabled`, `REJECTED - BAD_SIGNATURE (check 3): signature.sig does not match the bytes of manifest.json under the registered key of 'harbourview'`.
+- **Explanation / was the prediction right?** **Yes.** The claimed id passes check 2 because `harbourview` is genuinely trusted. That claim works against the attacker: check 3 then uses the real HarbourView public key from the registry, and the attacker's signature cannot satisfy it. Because the attacker re-signed, the manifest hashes match the tampered `app.py`, so check 5 would not have caught this. Check 3, using the registry's key, is the defence.
+
+### T10b: validly signed path traversal `../outside.txt` (scenario b)
+
+- **Scenario:** A manifest that is validly signed but contains the path `../outside.txt`, which simulates a careless or compromised trusted publisher.
+- **Prediction trap:** If the manifest is only hand-edited, **check 3 (BAD_SIGNATURE)** fires first and check 4 is never reached. To test check 4 on its own, the hostile manifest must be signed with the real key. `tests/t10_sign_custom_manifest.py` does this using the same library calls as `sign` (`release_guard.load_private_key` and `key.sign`). It copies the manifest bytes exactly and refuses to touch `release_A`.
+- **Prediction (which check, which code, why):** No written prediction for T10b was found in `T10-notes.txt` or anywhere else in the evidence. The brief requires one to be written before running. Based on the design, the expected result is REJECTED, **UNSAFE_PATH at check 4**, after checks 1–3 pass: path safety is checked on manifest text before any payload file is opened.
+- **Actual output:** `check 1`–`check 3 passed` (including `signature is valid under the REGISTRY's public key`), then `REJECTED - UNSAFE_PATH (check 4): manifest path '../outside.txt' contains '..'`.
+- **Explanation:** The result matches the expected design behaviour. A valid signature proves who wrote the manifest, not that its contents are safe. Check 4 stops a trusted-but-hostile manifest from making the verifier read outside `payload/`. `outside.txt` never needed to exist, because the rejection happens before any file is opened.
+
+## Assessment of tester notes
+
+| Test | Tester's verdict | Assessment | Notes / corrections |
+|------|------------------|------------|---------------------|
+| T1 | Pass | **Agree** | The NB screenshots do not show the hidden prompt (it scrolled off). The TC re-run (T1.1-v2-TC) does show it, so use the TC figures as primary evidence. |
+| T2 | **Fail** | **Disagree. The final result is Pass.** | The "Fail" describes an operator mistake (missing `--release` flag, and `w -c` typed instead of `wc -c`), not tool behaviour. The tool correctly rejected the malformed command line. The re-run in T2.1–T2.3-NB and T2.1–T2.2-v2-TC meets every requirement. Both rows are kept above, as the brief asks for failed runs. The T1 note also contains an unfinished T2 entry. |
+| T3 | Pass | **Agree** | NB used `printf '#'` (exactly one character, as the brief asks). TC used `echo "#"`, which adds two bytes (`#` plus a newline); the result is the same. |
+| T4 | Pass | **Agree** | The note truncates the missing file name as `config/settings`; the screenshot shows `config/settings.ini`. The `ls -R` before and after required by the brief appears only in the NB figures. |
+| T5 | Pass | **Agree** | None. |
+| T6 | (described, implied Pass) | **Agree. Pass.** | The original byte was `0xe2`, so writing `0x00` is a real change, as the brief requires. The note gives no explicit Pass/Fail line, so one is added here. |
+| T7 | (described, implied Pass) | **Agree. Pass.** | Minor gap: the real registry's `sha256sum` was taken before the test but not repeated after. `cat` still shows it unchanged. |
+| T8 | (described, implied Pass) | **Agree. Pass.** | None. Restoration was proven with `cmp`. |
+| T9 | (described as a "re-signing / idempotency & audit-logging test") | **Disagree. Fail.** | The brief's T9 is **sign with a wrong passphrase (and an empty one): clear error, no crash, files unchanged.** The screenshots show two **successful** signs with the correct passphrase. The files changed and no `BAD_PASSPHRASE` message appears. The required behaviour was never exercised, so T9 is unproven and must be re-run (see below). The note also contains the T10a prediction, which belongs in T10. |
+| T10 | (described, implied Pass) | **Agree with both results**, with labelling and process issues | The note is headed "T10b" but describes T10a first; they are two tests (scenarios **a** and **b**). The T10a prediction is in `T9-notes.txt` rather than `T10-notes.txt`. No written prediction for T10b was found, although the brief requires one before running. |
 
 ## Defects found and fixed
 
 | Found in | Symptom | Fix (commit) | Re-test result |
 |----------|---------|--------------|----------------|
-| | | | |
+| T2 attempt 1 | Test procedure: `--release` flag omitted, and `w` typed instead of `wc`. No tool defect. | No code change. Re-ran with the correct command. | **Pass** (T2 re-run) |
+| T9 | Test procedure: the correct passphrase was used, so the wrong- and empty-passphrase paths were never tested. No tool defect has been shown. | No code change needed yet. Re-run T9 as specified: (1) `cp -a release_A scratch/release_T9`; (2) `ls -l --time-style=full-iso` and `sha256sum` of `manifest.json` and `signature.sig`; (3) `sign` and type a **wrong** passphrase; (4) `sign` and press Enter at an **empty** prompt; (5) repeat step 2. Expected output: `SIGN FAILED - BAD_PASSPHRASE: the private key could not be unlocked (wrong or empty passphrase). Nothing was written.`, with no traceback and identical timestamps and hashes. | **Pending re-run** |
