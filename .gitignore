@@ -27,8 +27,10 @@ reports\README.md
 evidence\test_results.md
 
 # AI-produced guide for group reference material
+docs\AI_PROMPT_LOG.md
 docs\BUILD_AND_RUN.md
 docs\DEMO_VIDEO_GUIDE.md
+docs\DEMO_VIDEO_SCRIPT.md
 docs\DOCUMENTATION_GUIDE.md
 docs\PROJECT_GUIDE.md
 docs\REQUIREMENTS_CHECKLIST.md
@@ -37,7 +39,6 @@ docs\SECURITY_ANALYSIS.md
 docs\SYSTEM_DESIGN.md
 docs\TESTING_GUIDE.md
 docs\Assignment 2 Documentation.docx
-docs\AI_PROMPT_LOG.md
 
 # Editor / OS clutter
 .vscode/
