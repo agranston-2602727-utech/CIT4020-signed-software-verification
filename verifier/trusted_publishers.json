@@ -1,1 +1,7 @@
-[]
+[
+  {
+    "publisher_id": "harbourview",
+    "public_key_path": "keys/harbourview_public.pem",
+    "enabled": true
+  }
+]

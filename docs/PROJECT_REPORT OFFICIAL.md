@@ -266,7 +266,7 @@ All ten brief tests were run against `release_guard.py` and recorded with termin
 | T9             | Ran `sign` on a copy twice, with `ls -l` and `sha256sum` before and after                               | Wrong or empty passphrase: clear error, no crash, files unchanged | Both runs gave `SIGNED` (correct passphrase used); files and hashes changed; wrong and empty passphrases never tried                                      | **Fail** (not carried out as specified; re-run pending) | T9.1-RF, T9.2-RF             |
 | T10a           | Scenario (a): signed with the attacker's own key, claiming `publisher_id` `harbourview`                 | Prediction: BAD_SIGNATURE at check 3                              | Checks 1–2 passed; `REJECTED - BAD_SIGNATURE (check 3)`                                                                                                   | Pass (prediction correct)                               | T10.1-RF, T10.2-RF           |
 
-**Summary.** 11 of the 12 brief test cases (T1–T8, T10a, T10b) produced exactly the expected result, and every rejection named the right reason and check number. Two runs are recorded as Fail, and both are procedure problems, not tool defects:
+**Summary.** 10 of the 11 test cases in the table (T1–T8, with T4 split into T4a and T4b, plus T10a) produced exactly the expected result, and every rejection named the right reason and check number. Two runs are recorded as Fail, and both are procedure problems, not tool defects:
 
 - **T2, first attempt:** the command was mistyped. The tool rejected the malformed arguments cleanly, and the corrected re-run passed.
 - **T9:** the screenshots show two *successful* signs with the correct passphrase, so the wrong- and empty-passphrase paths were never tried. The code path exists: `load_private_key` returns `None`, and `sign` prints `SIGN FAILED - BAD_PASSPHRASE … Nothing was written.` before writing anything. It still has to be shown in a re-run, with `ls -l --time-style=full-iso` and `sha256sum` before and after.
@@ -276,83 +276,48 @@ All ten brief tests were run against `release_guard.py` and recorded with termin
 
 ---
 
-### Group (6) Main Objective
- - Build the tool (`setup`, `sign`, `verify`, followed by logging);
- - Test the tool with 10 Tiers ranging from Tier 1 - Tier 10, document screenshot based on these test.
- - Write a report inclusive of (risk analysis, design, results, reflection, contributions, AI declaration);
- - Submit a source ZIP and a 3 - 4 Minute DEMO Video;
- - **Every Member** explain the code in a live demo 
- 
---- 
+# Reflection
 
-## How signed release verifications works three layers 
+### 1. Hash vs digital signature vs trust decision
 
-| Layer                           | What it does                                                                                                                                                       | What it cannot do Alone                                                                                |
-| :------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------- |
-| **HASH (SHA-256)**              | A 64-hex-character fingerprint of a file's exact bytes. Change one byte and the hash changes completely.                                                           | It has no secret, so an attacker can compute a matching hash for their altered file.                   |
-| **Digital Signature (Ed25519)** | The publisher's private key signs the manifest (the list of hashes). Anyone with the **public  key** can check it, but only the private-key holder can produce it. | It cannot say whether the key belongs to someone you should trust; an attacker can with their own key. |
-| **Trust Decision (Registry)**   | The Client's own list of approved publishers and their public keys, with an on/off switch.                                                                         | It is only as safe as the registry file itself.                                                        |
-## Key ideas in one line each
+A **hash** (SHA-256) is a fingerprint of a file's exact bytes. If one character changes, the hash changes, which is how T3 was caught with `HASH_MISMATCH`. But a hash has no key: anyone can compute one, including an attacker for their own altered file. On its own, it proves nothing about *who* made the file.
 
- - **SHA-256:** A one-way function. It is easy to compute and practically impossible to find two files with the same hash. 
- - **Ed25519:** A modern elliptic-curve signature scheme with 64-byte signatures, fast and hard to misuse. We use the `cryptography` (based on recommendations from Claude) library's implementation, never or our own library.
- - **Private Key:** Stays with the publisher, encrypted with a passphrase. Whoever holds it is the publisher.
- - **Public Key:** Given to clients. It can only check signatures, not make them.
- - **Trusted Publisher:** A registry entry `{publisher_id, public_key_path, enables}` on the client's side. 
- - **Manifest:** `manifest.json`, which lists every payload file with its SHA-256. Signing the manifest indirectly signs every file through its hash. 
+A **digital signature** (Ed25519) ties the manifest to whoever holds the private key, and anyone with the matching public key can check it. It proves who signed the manifest and that it has not changed since. That is why editing the manifest in T5 and changing one byte of `signature.sig` in T6 both gave `BAD_SIGNATURE` at check 3. However, a signature does not tell us whether we should trust the person who signed it. An attacker can make a perfectly valid signature with their own key.
 
-## Project Workflow
- 
-```text
-Publisher: setup (once) => sign release_A/ (payload + manifest + signature)
-Client: (receives public key + registry entry out of band) => verify release_A
-```
+The **trust decision** is made by HarbourView's own registry (`verifier/trusted_publishers.json`). It decides *whose* key counts. In T7, `otherpub` signed its release with its own key, but it was rejected at check 2 with `UNKNOWN_PUBLISHER` because HarbourView never approved it. T10a went further: the attacker signed with their own key while claiming the approved id `harbourview`. Check 3 uses the public key from the client's registry, not one supplied with the release, so the claim gained nothing and the release was rejected with `BAD_SIGNATURE`. In short, the hash checks the files, the signature checks who signed and that nothing changed, and the registry decides whether we trust that signer.
 
-### Part A: Setup & Keys
+### 2. Why T3 and T5 fail for different reasons
 
-**GOAL:**
-A one-time command that create an ED25519 key pair, saves the encrypted private key using a passphrase from a hidden prompt), then saves the public key in verifier folder, that creates `trusted_publishers.json` and refuses to overwrite Existing keys.
+In T3 we appended one character to `app.py` but left `manifest.json` and `signature.sig` alone. The manifest was still genuine, so checks 1–4 passed, including the signature at **check 3**. **Check 5** then recomputed the hash of `app.py`, found it no longer matched the signed value, and rejected the release with `HASH_MISMATCH`, naming the file. This is a **payload-integrity failure**: the signed list is fine, but the files no longer match it.
 
-**Why Does this matters:**
-The private key is the publisher's identity. Whoever holds it can sign anything the client will accept. Encrypting the private key means a stolen file alone isn't enough, and refusing to overwrite means a slip of the keyboard can't destroy the only key create by the publisher.
+In T5 we changed `release_name` inside `manifest.json` without signing again. The payload was untouched, so every file hash in the manifest was still correct. But the signature covers the exact bytes of the manifest, so **check 3** failed with `BAD_SIGNATURE`, and the tool stopped before check 5 ever looked at the payload. This is a **manifest-authenticity failure**: the signed statement itself was altered. The check number in each output (5 vs 3) shows which layer caught the change.
 
-### Part B: Sign a Release 
+### 3. What happens if the private key is stolen
 
-**What is the Release** 
-A release is a folder that holds a software version a publisher wants to ship to the client (HarbourView)
+If the thief also has, or guesses, the passphrase, they can sign releases that pass all five checks, and the tool cannot tell them apart from genuine ones.
 
-``` text 
-release_A/
-├── payload/              ← the publisher's actual files (e.g. app.py)
-├── manifest.json         ← created by 'sign'
-└── signature.sig         ← created by  'sign'
-```
+- **Response:**
+  - Set `enabled` to `false` for the publisher in the registry. T8 showed this takes effect on the very next verify (`PUBLISHER_DISABLED`), because the registry is re-read every time, with no caching.
+  - If the key is never coming back, remove the entry altogether.
+  - The publisher then runs `setup` to create a new key pair, the registry is updated with the new public key, and the legitimate releases are re-signed. Until they are re-signed, genuine releases signed with the old key will also be rejected.
+- **Prevention:**
+  - The private key is encrypted with a passphrase of at least 8 characters and stored only in `publisher_keys/` with owner-only permissions. It is never in `verifier/`, Git or the ZIP.
+  - The tool unlocks the key before writing anything, so a wrong or empty passphrase is designed to stop with `SIGN FAILED - BAD_PASSPHRASE` and write nothing. Our T9 run did not exercise this path (the correct passphrase was used), so it still has to be shown in the T9 re-run.
+  - Access to the publisher machine should be limited to the people who sign releases.
+- **What stays exposed:**
+  - Any release the thief signed before the key was disabled, and anything a client already accepted and installed from it. Disabling the key does not undo those.
+  - A weak passphrase can still be guessed offline once the key file is stolen.
 
-**GOAL:**
+### 4. Why a signed release can still contain harmful software
 
+A signature only proves **who** signed the release and that it is **unchanged** since signing. It does not prove the code is **safe**. Harmful code can still be signed in several ways:
+- **A compromised or malicious publisher:** the bad code is signed with a genuine key and passes every check.
+- **A compromised build system:** malware is inserted before signing, so the publisher signs it without knowing.
+- **Honest bugs:** a careless mistake gets signed just like good code.
 
-**Why does this matters:**
-The manifest turns "a folder of files" into one small, signable statement. Once the manifest is sign every file through it's hash is also signed. The catch is that the signature is over bytes, not over "The same JSON".
+Our own design reflects this. Check 4 still inspects every manifest path for `..` or a leading `/` *after* the signature has passed at check 3, because a trusted publisher could still sign a manifest that points outside `payload/`. Signing does not make content trustworthy, so other layers are still needed:
+- code review and testing before release;
+- malware scanning;
+- running new releases in a sandbox first.
 
-### Part C: Verify a Release 
-
-**GOAL:**
-Run five checks **in order.** Print **Accepted** only if every check passes; otherwise print **REJECTED** and the reason, and stop at the first failure.
-
-**The Five(5) Checks 'In order':**
-
-| #   | Check                                                                           |             Rejection Reason              | What it protects, and what it reads                                                                                        |
-| :-- | ------------------------------------------------------------------------------- | :---------------------------------------: | :------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `mainfest.json` and `signture.sig` exit; JSON readable; required fields present |             INVALID_MANIFEST              | `release_guard.py`: The junk input must produce a clean rejection, not a crash. Reads the two release files as raw bytes.  |
-| 2   | `publisher_id` is in the registry and `enabled`                                 |  UNKNOWN_PUBLISHER / PUBLISHER_DISABLED   | **Whose** key to trust, a client-side decision. Reads the registry.                                                        |
-| 3   | Signature valid using the public key **from the registry**                      |               BAD_SIGNATURE               | That the manifest is unchanged and was made by the key holder. Reads the registry's public key and the raw manifest bytes. |
-| 3   | No manifest path contains `..` or starts with  `/`                              |                UNSAFE_PATH                | Stops the tool reading files outside `payload/` even if the manifest is validly signed. Reads only manifest text.          |
-| 5   | Every listed files exists, no extras, every recomputed hash matches             | MISSING_FILE / EXTRA_FILE / HASH_MISMATCH | That the real payload matches what was signed. The only check that touches **`payload/`**                                  |
-**The logic of the order:**
-Structure comes first, because if the data isn't parsed then the data can't be used. 
-- Identity comes before the signature check, because the registry's key is needed to check the signature. 
-- Authenticity comes before trusting the manifest's contents (**`an unauthenticated manifest is an attcker-controlled text`**). Path safety comes before any payload file is opened. (Edit here and check the project plan document).
-
-## Part D: Log 
-**GOAL:**
-Append one line to `release_log.json` for **every sign or verify attempt:** UTC time, operation, release folder, `publisher_id`, result, reason. Publishers should never log keys or passphrases.
+This is also why `release_guard.py` treats the payload purely as data. It only reads the bytes to hash them, and never runs, installs or extracts the files it checks.
